@@ -2,9 +2,6 @@ language: groovy
 jdk:
 - openjdk8
 sudo: false
-branches:
-  only:
-  - master
 addons:
   apt:
     packages:
@@ -14,11 +11,19 @@ before_cache:
 - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
 cache:
   directories:
-  - $HOME/.gradle/caches/
-  - $HOME/.gradle/wrapper/
-after_success:
-  - '[ "${TRAVIS_PULL_REQUEST}" = "false" ] && travis_retry ./gradlew publish'
-env:
-  global:
-  - secure: JcvWOzXzehX6zAzzsa7zTaQS4Bmq+DwkdbIOhLda7pRw8u8UQrgEl9daAafmgWdKKP/bEsm5K23n2ln7TrHFfMKWjoZODSs8qAfiVo0wwWojNuDi75R4vfAf2hOW0/PfhLXqHjY3pCT5KDl3QCPDKvcSgzB5YjAV5gjOhs44aUkq3asra6+68ngbpnGseEJUgq12ah5hi2bSy8+r642x98gkpjW+wq0H1uV5Sj8cnowU+0oOvx3BYEFQSZzKpbsupVG2rDeU/2z32q9WYqbcsCRMAl2YVRaDQMev2bbj/u2rMHtPi4aaPyNQSUgCBoOe9WbMCSTs0ZEJNwRfYGBdtPkC1TjUGJAZ9AviLRqwF8W2e6E2yRFYaxaQkegnPN9YVxWEirfxEpgZtFrTG9oRCvMQ6rLW49ZfRPQJ0SqSoYlCgPLdXIV9L0aO1MD7jfsFeHyVXr7LVrzvy4+VC+r/h48RXpjmK4WM70l2YLZdTkbMbzm7onvTcG3TNfOa827KWxo+nHrUOc883zJxoqpzaDNGVoWtkHJpLUJHK3jC9YlStM4y1e3+rJE4fDoVMXDcWtGpqCwWtBZG4p5Q4Q71RH7NXLzjrI7iYgvHFYWpcNWZomsFHPOa+I5KEug89A8gRw/Q9i++njZRvj6hLyFXZx4X9hHBkTnjrB5uCKzj0gE=
-  - secure: SuzPpXJz6NgueghEt44PM9SiSrMMC9hIWfUB+/2jjXC7uEw9hyaIGu8QhuqfQrR6V7MLkPPgOc4eb7pChx6EOuvqcv+yAffxFaSRrq0RwUyuS0o4bcZ7d4xQ/6XR0Hn/TbSD4qDP94uzHtUuqCqmQ0844PTcbkT/XUVVWm3flbEhOGM7MjBn/S87DZjAW7/HPTx2v7eGtku0L7BHvCPvxaDcTplKTQhCbD7tI1SZadYqp9IU6o9p/N5TeRyjDxZoxYQWktaOqWtc3K7oR9YdMPj0h2yce96s4LJkUS6ENEIZGk9t2SpXMdU5+CX4bgUglUI2PgdKnsQSUrRQWW1lE5vna6jTg2cE2BYp1EckHANEawJrSWYbUxlhhQGsngc5iccUeFKzSEJtjcHR2hX1FFFdQUX/vDefvUHtgH7W+zTrhBxLD0wzjKshzWAGpodaUv6yoFJVBws4f7uMLD60CZBihlTGzALqncIOnvAzRpSR//xh7lRZUZgV28oG5ZZDQ0GUBm6BP/YcXlURb7jKQuQhO+oOo6sydQnuev7XzvlLQXPOuzOYwUzzKtCi76HX2A+XHyGzgkK/QoLz73MNttOTKJRc6DPo3X96a1b0VciKBmFpBGinb6REzK9gBuax+i/ziJENHLXtm2qvPrRXaFKE5zB4IAHnhnNyQCfDaXo=
+  - "$HOME/.gradle/caches/"
+  - "$HOME/.gradle/wrapper/"
+script:
+- "./gradlew clean && ./gradlew war"
+deploy:
+  provider: releases
+  api_key:
+    secure: PtPyhBC5Ln3r5bU+SNOKfttSJ28Z/Pg1xi4edadmT6OVCmnktksoc/odBFoGvJ+rzOFceU5LVegude4lCNKpjclrhdu2Pde0cz3P5XxMpJ/TGJhDj9VysCKMmhI+pXIwxUC2Gc90YGqcG5/EveqPpRbxs5iuf61YveNBultPR4jYkyiEDiCAh1I98AfLAY/wOHopx/fpGJDfAHUi/1NxQbNkdV3Z5QrZO99FGWr6mIqxti7U3+1zL7tmF92JPNhxDkSjZBwlFfaeP5R/C1PqvjVUYl8E4nN2PuGVma5FmN1ZJwGhFoUUMcRq4qoflGJBjVtaCsHGulKkZo6d7oXEp5TMJJ4u5oIREtMEeOqpHH7c2IlvsIYoJtgTfWJP7SHeYgeWTSACTJxbcA4HHuJTe5xEamKFOxEH4Ck4pBiIZQHY8oqF2/IfdRQlzbO59+dqQZiksxaSXyWEEg5Ee77P4lO4X6677qUQg9Ub0Mm2Ktp8ucHRzu45xkJEV5tB2BFH7dsr/nqTkBgIk73g92PcMZKTxX9yQH93eI48ukOko8t8w5mTTm5sxC4YxA1zWED3ssBwGNKUgiSOV0kVDrnot0H82xG2cfPKHNBcD2c96NG3MkKg7sy32UGQCHS0BYMxcylMWyLCyC5m27NUQ/B2MLDBy6FFkD4SchjWPeEhrjg=
+  file_glob: true
+  file: build/libs/spatial-service-*.war
+  skip_cleanup: true
+  overwrite: true
+  on:
+    repo: bioatlas/spatial-service
+    all-branches: true
+    tags: true
