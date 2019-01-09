@@ -254,7 +254,7 @@ class ManageLayersService {
                 def errors = publishService.layerToGeoserver([files: [shp.exists() ? shp.getPath() : bil.getPath()]], null)
 
                 if (errors) {
-                    map.put("error", "failed to upload to geoserver")
+                    map.put("error", errors.inspect())
                 } else {
                     map.put("raw_id", name)
                     map.put("columns", columns)
@@ -270,7 +270,7 @@ class ManageLayersService {
             return map
         }
 
-        return null
+        return [error: pth +" does not exist!" ]
     }
 
     /**
@@ -313,6 +313,13 @@ class ManageLayersService {
             if (response.text) {
                 output[1] = response.text
             }
+            //Add extra info
+            switch (response.statusCode) {
+                case "401":
+                    output[1] = 'UNAUTHORIZED: ' + url;
+                    break
+            }
+
         }
 
         return output
@@ -1004,7 +1011,9 @@ class ManageLayersService {
             retMap.put("error", "name parameter missing")
         } else {
             //make it simple, sname = sid
-            field.put('sname', field.sid)
+            if (field.sname == null || field.sname.isEmpty()) {
+                field.put('sname', field.sid)
+            }
 
             //swap 'true' with 'on'
             if (field.containsKey('addtomap') && "true".equalsIgnoreCase(String.valueOf(field.addtomap))) field.addtomap = 'on'
@@ -1082,7 +1091,12 @@ class ManageLayersService {
                 if (!field.containsKey('name')) field.put('name', defaultField.name)
                 if (!field.containsKey('type')) field.put('name', defaultField.type)
 
-                Map lyr = layerMap(id)
+                Map lyr
+                if (field.containsKey('spid')) {
+                    lyr = layerMap(field.spid)
+                } else {
+                    lyr = layerMap(id)
+                }
 
                 if ("contextual".equalsIgnoreCase(lyr.type.toString())) {
                     //match case insensitive for sname, sid, sdesc

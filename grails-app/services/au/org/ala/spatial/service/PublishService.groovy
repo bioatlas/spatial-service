@@ -18,26 +18,17 @@ package au.org.ala.spatial.service
 import au.org.ala.spatial.util.UploadSpatialResource
 import grails.converters.JSON
 import org.apache.commons.io.FileUtils
-import org.springframework.jdbc.core.JdbcTemplate
-
-import javax.sql.DataSource
 
 class PublishService {
 
     def grailsApplication
     def manageLayersService
-    JdbcTemplate jdbcTemplate
     def tasksService
     def fileService
     def dataSource
     def layerDao
     def fieldDao
     def objectDao
-
-    void setDataSource(DataSource dataSource) {
-        this.dataSource = dataSource
-        jdbcTemplate = new JdbcTemplate(dataSource)
-    }
 
     // Unpacks a published zip file and performs some actions.
     // Run time should be kept to a minimum because a spatial-slave is waiting for this to complete
@@ -59,6 +50,9 @@ class PublishService {
             if ('file'.equalsIgnoreCase(k) || 'metadata'.equalsIgnoreCase(k)) {
                 // no activity required. The unzip takes care of this
 
+            } else if ('delete'.equalsIgnoreCase(k)) {
+                delete(output, path)
+
             } else if ('shapefile'.equalsIgnoreCase(k) || 'raster'.equalsIgnoreCase(k) || 'layer'.equalsIgnoreCase(k) ||
                     'layers'.equalsIgnoreCase(k) || 'envelopes'.equalsIgnoreCase(k)) {
                 // note: identify single area shapefile and raster as contextual layer variations
@@ -71,7 +65,8 @@ class PublishService {
                 // update output.geoserverLayerName
 
                 // register as a layer (single area or contextual or environmental)
-            } else if ('sld'.equalsIgnoreCase(k)) {
+            } else if ('sld'.equalsIgnoreCase(k)  ) {
+                //skipSLDCreation
                 addStyle(output, path)
             } else if ('areas'.equalsIgnoreCase(k)) {
                 addArea(output, path)
@@ -168,7 +163,7 @@ class PublishService {
                             extra, geoserverUsername, geoserverPassword, name)
                     if (!out.startsWith("200") && !out.startsWith("201")) {
                         //ignore errors
-                        // errors.put(String.valueOf(System.currentTimeMillis()), out)
+                        errors.put(String.valueOf(System.currentTimeMillis()), out)
                     }
 
                     //Upload sld
@@ -210,6 +205,29 @@ class PublishService {
             }
         } catch (err) {
             log.error 'failed to upload sld: ' + output + ', ' + path, err
+        }
+
+        errors
+
+    }
+
+    def delete(output, path) {
+        def errors = [:]
+        try {
+            output.files.each { file ->
+
+                def p = (file.startsWith('/') ? grailsApplication.config.data.dir + file : path + '/' + file)
+                def f = new File(p)
+                if (f.exists()) {
+                    try {
+                        f.delete()
+                    } catch (err) {
+                        log.error 'failed to delete file: ' + file + ', ' + path, err
+                    }
+                }
+            }
+        } catch (err) {
+            log.error 'failed to delete file: ' + output + ', ' + path, err
         }
 
         errors
@@ -275,6 +293,17 @@ class PublishService {
                 file, resource, "text/plain")
     }
 
+    def callGeoserverDelete(String urlPath) {
+        def getResponse = callGeoserver("GET", urlPath, null, null)
+
+        // only delete when there is a response status code 2xx
+        if (getResponse && getResponse[0].startsWith("2")) {
+            return callGeoserver("DELETE", urlPath, null, null)
+        } else {
+            return null;
+        }
+    }
+
     def layerToGeoserver(output, path) {
         def errors = [:]
         if (grailsApplication.config.geoserver.canDeploy) {
@@ -316,14 +345,14 @@ class PublishService {
                             if (oldPrj.exists()) FileUtils.moveFile(oldPrj, tmpPrj)
 
                             //attempt to delete
-                            callGeoserver("DELETE", "/rest/workspaces/ALA/coveragestores/" + name, null, null)
+                            callGeoserverDelete("/rest/workspaces/ALA/coveragestores/" + name)
 
                             if (grailsApplication.config.geoserver.remote.geoserver_data_dir) {
                                 // delete the tif file if it exists
-                                callGeoserver("DELETE", "/rest/resource/data/" + name + ".tif", null, null)
+                                callGeoserverDelete("/rest/resource/data/" + name + ".tif")
 
                                 // delete the prj file if it exists
-                                callGeoserver("DELETE", "/rest/resource/data/" + name + ".prj", null, null)
+                                callGeoserverDelete("/rest/resource/data/" + name + ".prj")
 
                                 // upload the tif file
                                 callGeoserver("PUT", "/rest/resource/data/" + name + ".tif", geotiff.getPath(), null)
@@ -349,8 +378,25 @@ class PublishService {
 
                             if (sld.exists()) {
                                 //Create style
-                                def out = UploadSpatialResource.sld(geoserverUrl, geoserverUsername, geoserverPassword, name, sld.getPath())
+                                String extra = "";
+                                String out = UploadSpatialResource.loadCreateStyle(geoserverUrl + "/rest/styles/",
+                                        extra, geoserverUsername, geoserverPassword, name)
+                                if (!out.startsWith("200") && !out.startsWith("201")) {
+                                    errors.put(String.valueOf(System.currentTimeMillis()), out)
+                                }
 
+                                //Upload sld
+                                out = UploadSpatialResource.loadSld(geoserverUrl + "/rest/styles/" + name,
+                                        extra, geoserverUsername, geoserverPassword, sld.getPath());
+                                if (!out.startsWith("200") && !out.startsWith("201")) {
+                                    errors.put(String.valueOf(System.currentTimeMillis()), out)
+                                }
+
+                                //Apply style
+                                String data = "<layer><enabled>true</enabled><defaultStyle><name>" + name +
+                                        "</name></defaultStyle></layer>";
+                                out = UploadSpatialResource.assignSld(geoserverUrl + "/rest/layers/ALA:" + name, extra,
+                                        geoserverUsername, geoserverPassword, data)
                                 if (!out.startsWith("200") && !out.startsWith("201")) {
                                     errors.put(String.valueOf(System.currentTimeMillis()), out)
                                 }
@@ -366,12 +412,12 @@ class PublishService {
                     def sld = new File(name + ".sld")
 
 
-                    callGeoserver("DELETE", "/rest/workspaces/ALA/datastores/" + name, null, null)
+                    callGeoserverDelete("/rest/workspaces/ALA/datastores/" + name)
 
                     if (grailsApplication.config.geoserver.remote.geoserver_data_dir) {
                         for (String filetype : ["shp", "prj", "shx", "dbf", "fix", "sbn", "sbx", "fbn", "fbx", "qix", "cpg", "shp.xml", "atx", "mxs", "ixs", "ain", "aih"]) {
                             // delete file if it exists
-                            callGeoserver("DELETE", "/rest/resource/data/" + name + "." + filetype, null, null)
+                            callGeoserverDelete("/rest/resource/data/" + name + "." + filetype)
 
                             // upload the file
                             File uploadFile = new File(shp.getPath().replace(".shp", "." + filetype))

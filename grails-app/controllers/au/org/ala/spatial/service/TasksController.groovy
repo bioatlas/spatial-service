@@ -242,7 +242,7 @@ class TasksController {
             } else if (file.endsWith('.html')) {
                 render(text: IOUtils.toString(new FileInputStream(f)), contentType: "text/html", encoding: "UTF-8")
                 return
-            } else if (file.endsWith('.jpg')) {
+            } else if (file.endsWith('.jpg') || file.endsWith('jpeg')) {
                 response.setContentType("image/jpeg")
                 ok = true
             } else if (file.endsWith('.png')) {
@@ -254,6 +254,9 @@ class TasksController {
             }
 
             if (ok) {
+                response.setContentLength((int) f.length());
+                response.addHeader("Content-Disposition", "attachment");
+
                 OutputStream os = response.getOutputStream()
                 InputStream is = new BufferedInputStream(new FileInputStream(f))
                 try {

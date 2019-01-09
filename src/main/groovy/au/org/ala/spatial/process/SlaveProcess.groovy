@@ -262,7 +262,7 @@ class SlaveProcess {
         if (!task.output.containsKey(name)) task.output.put(name, [])
         task.output.get(name).add(value)
 
-        if (download) {
+        if (download && !"download".equalsIgnoreCase(name)) {
             addOutput('download', value)
         }
     }
@@ -274,6 +274,13 @@ class SlaveProcess {
         } else {
             str.replace("'", "''").replace("\\", "\\\\")
         }
+    }
+
+    def facetOccurenceCount(facet, species) {
+        String url = species.bs + "/occurrence/facets?facets=" + facet + "&flimit=-1&fsort=index&q=" + species.q
+        String response = Util.getUrl(url)
+        JSONParser jp = new JSONParser()
+        ((JSONArray) jp.parse(response))
     }
 
     def facetCount(facet, species) {
@@ -984,7 +991,7 @@ class SlaveProcess {
                         q = ["-*:*"]
                     }
                 } catch (Exception e) {
-                    log.error("Falied to retrieve intersection area", e)
+                    log.error("Failed to retrieve intersection area", e)
                     species.wkt = null
                     q = ["-*:*"]
                 }
