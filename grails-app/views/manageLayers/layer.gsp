@@ -109,7 +109,7 @@
                         }
                     }
 
-                    var map = L.map('map').setView([-22, 122], 4);
+                    var map = L.map('map').setView([${grailsApplication.config.map.lat}, ${grailsApplication.config.map.lng}], ${grailsApplication.config.map.zoom});
 
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
