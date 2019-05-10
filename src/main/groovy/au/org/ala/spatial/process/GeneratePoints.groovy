@@ -85,6 +85,7 @@ class GeneratePoints extends SlaveProcess {
             def start = System.currentTimeMillis()
             def maxTime = 60 * 60 * 1000 //2hr
             while (start + maxTime > System.currentTimeMillis()) {
+                Thread.sleep(10000) // 10s
                 def txt = Util.getUrl(statusUrl)
                 if (txt == null) {
                     // retry
@@ -103,7 +104,7 @@ class GeneratePoints extends SlaveProcess {
                     task.message = "failed upload " + statusUrl
                     break
                 } else {
-                    def json = txt as JSON
+                    def json = JSON.parse(txt)
                     task.message = json.status + ": " + json.description
                 }
             }

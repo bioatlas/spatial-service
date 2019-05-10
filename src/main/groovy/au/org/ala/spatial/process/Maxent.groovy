@@ -34,11 +34,11 @@ class Maxent extends SlaveProcess {
         def contextualLayers = []
         layers.each { layer ->
             if (layer.endsWith('_aloc')) {
-                contextualLayers.add(l)
+                contextualLayers.add(layer)
             } else {
                 def l = getField(layer)
                 if (l != null && l.type == 'c') {
-                    contextualLayers.add(l)
+                    contextualLayers.add(l.id)
                 }
             }
         }
@@ -120,9 +120,9 @@ class Maxent extends SlaveProcess {
             }
 
             replaceMap.put("end of this page.<br>", "end of this page.<br><p>" + paramlist + "</p>")
-            replaceMap.put("This page contains some analysis of the Maxent model for", "This <a href='http://www.cs.princeton.edu/~schapire/maxent/'>Maxent</a> v3.3.3e predictive model for")
-            replaceMap.put(", created", " was created")
-            replaceMap.put(" using Maxent version 3.3.3e.", ".")
+            //replaceMap.put("This page contains some analysis of the Maxent model for", "This <a href='http://www.cs.princeton.edu/~schapire/maxent/'>Maxent</a> v3.3.3e predictive model for")
+            //replaceMap.put(", created", " was created")
+            //replaceMap.put(" using Maxent version 3.3.3e.", ".")
             replaceMap.put("If you would like to do further analyses, the raw data used here is linked to at the end of this page", "Links at the bottom of this page to the raw data may be used for further analysis")
             replaceMap.put(getTaskPath(), "")
 
@@ -138,7 +138,7 @@ class Maxent extends SlaveProcess {
                     sbTable.append("<pre>")
                     if (!ctx.endsWith("_aloc")) {
                         sbTable.append("<span style='font-weight: bold; text-decoration: underline'>" + ctx + " legend</span><br />")
-                        sbTable.append(IOUtils.toString(new FileInputStream(GridCutter.getLayerPath(resolution.toString(), ctx, "c", ctx) + ".txt")))
+                        sbTable.append(IOUtils.toString(new FileInputStream(GridCutter.getLayerPath(resolution.toString(), ctx, ctx) + ".txt")))
                         sbTable.append("<br /><br />")
                         sbTable.append("</pre>")
                     }
@@ -175,8 +175,7 @@ class Maxent extends SlaveProcess {
             //writeProjectionFile(getTaskPath());
 
             //convert .asc to .grd/.gri
-            convertAsc(getTaskPath() + "species.asc", getTaskPath() + task.id + "_species")
-
+            convertAsc(getTaskPath() + "species.asc", "${grailsApplication.config.data.dir}/layer/${task.id}_species")
         }
         writeMaxentsld(grailsApplication.config.data.dir + "/layer/" + task.id + "_species.sld")
         addOutput("layers", "/layer/" + task.id + "_species.sld")
@@ -218,34 +217,8 @@ class Maxent extends SlaveProcess {
     }
 
     def writeMaxentsld(filename) {
-        FileUtils.writeStringToFile(new File(filename), "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n" +
-                "        <StyledLayerDescriptor version=\"1.0.0\" xmlns=\"http://www.opengis.net/sld\" xmlns:ogc=\"http://www.opengis.net/ogc\"\n" +
-                "        xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n" +
-                "        xsi:schemaLocation=\"http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd\">\n" +
-                "        <NamedLayer>\n" +
-                "        <Name>alastyles</Name>\n" +
-                "    <UserStyle>\n" +
-                "      <Name>alastyles</Name>\n" +
-                "        <Title>ALA MaxEnt distribution</Title>\n" +
-                "      <FeatureTypeStyle>\n" +
-                "        <Rule>\n" +
-                "          <RasterSymbolizer>\n" +
-                "            <ColorMap type=\"intervals\" extended=\"true\">\n" +
-                "              <ColorMapEntry color=\"#FFFFFF\" quantity=\"-9999\" opacity=\"0.0\" />\n" +
-                "        <ColorMapEntry color=\"#FFFFFF\" quantity=\"0.0000\" opacity=\"0.0\" />\n" +
-                "        <ColorMapEntry color=\"#CCFF00\" quantity=\"0.0001\" opacity=\"1\"/>\n" +
-                "        <ColorMapEntry color=\"#CCCC00\" quantity=\"0.2\" opacity=\"1\" />\n" +
-                "        <ColorMapEntry color=\"#CC9900\" quantity=\"0.4\" opacity=\"1\" />\n" +
-                "        <ColorMapEntry color=\"#CC6600\" quantity=\"0.6\" opacity=\"1\" />\n" +
-                "        <ColorMapEntry color=\"#CC3300\" quantity=\"0.8\" opacity=\"1\" />\n" +
-                "        <ColorMapEntry color=\"#0000FF\" quantity=\"1.0\" opacity=\"1\"/>\n" +
-                "        </ColorMap>\n" +
-                "          </RasterSymbolizer>\n" +
-                "        </Rule>\n" +
-                "      </FeatureTypeStyle>\n" +
-                "        </UserStyle>\n" +
-                "  </NamedLayer>\n" +
-                "        </StyledLayerDescriptor>")
+        def resource = Maxent.class.getResource("/maxent/maxent.sld")
+        FileUtils.writeStringToFile(new File(filename), resource.text)
     }
 
     private void writeProjectionFile(String outputpath) {

@@ -19,7 +19,6 @@ import au.com.bytecode.opencsv.CSVWriter
 import au.org.ala.layers.dto.Layer
 import grails.converters.JSON
 import grails.io.IOUtils
-import org.apache.commons.lang.ArrayUtils
 import org.apache.commons.lang.StringEscapeUtils
 import org.apache.commons.lang.StringUtils
 
@@ -29,6 +28,8 @@ class LayerController {
 
     def layerDao
     def fieldDao
+    def fileService
+    def authService
 
     def list() {
         def fields = fieldDao.getFieldsByCriteria('')
@@ -61,21 +62,21 @@ class LayerController {
                 is = new BufferedInputStream(new FileInputStream(f))
                 IOUtils.copy(is, os)
                 os.flush()
-            } catch (err) {
+            } catch (Exception err) {
                 log.debug 'failed to write layer image : ' + id, err
             } finally {
                 if (os != null) {
                     try {
                         os.close()
-                    } catch (err) {
-                        log.trace(err.getMessage(), err)
+                    } catch (Exception err1) {
+                        log.trace(err1.getMessage(), err1)
                     }
                 }
                 if (is != null) {
                     try {
                         is.close()
-                    } catch (err) {
-                        log.trace(err.getMessage(), err)
+                    } catch (Exception err2) {
+                        log.trace(err2.getMessage(), err2)
                     }
                 }
             }
@@ -88,27 +89,25 @@ class LayerController {
     def csvlist() {
         List layers = layerDao.getLayers()
 
-        String header = ""
-        header += "ID,"
-        header += "Short name,"
-        header += "Name,"
-        header += "Description,"
-        header += "Data provider,"
-        header += "Provider website,"
-        header += "Provider role,"
-        header += "Metadata date,"
-        header += "Reference date,"
-        header += "Licence level,"
-        header += "Licence info,"
-        header += "Licence notes,"
-        header += "Type,"
-        header += "Classification 1,"
-        header += "Classification 2,"
-        header += "Units,"
-        header += "Notes,"
-        header += "More information,"
-        header += "Keywords,"
-        header += "Date Added"
+        String[] header = ["ID",
+                           "Short name",
+                           "Name",
+                           "Description",
+                           "Data provider",
+                           "Provider website",
+                           "Provider role",
+                           "Metadata date",
+                           "Reference date",
+                           "Licence level",
+                           "Licence info",
+                           "Licence notes",
+                           "Type",
+                           "Classification 1",
+                           "Classification 2",
+                           "Units",
+                           "Notes",
+                           "More information",
+                           "Keywords", "Date Added"]
 
         response.setContentType("text/csv charset=UTF-8")
         response.setHeader("Content-Disposition", "inlinefilename=ALA_Spatial_Layers.csv")
@@ -117,16 +116,36 @@ class LayerController {
         try {
             cw = new CSVWriter(response.getWriter())
             cw.writeNext("Please provide feedback on the 'keywords' columns to data_management@ala.org.au".split("\n"))
-            cw.writeNext(header.split(","))
+            cw.writeNext(header)
 
-            Iterator<Layer> it = layers.iterator()
             List<String[]> mylist = new Vector<String[]>()
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd")
-            while (it.hasNext()) {
-                Layer lyr = ++it
-                mylist.add(ArrayUtils.add(lyr.toArray(), lyr.getDt_added() == null ? '' : sdf.format(lyr.getDt_added())) as String)
+            for (Layer lyr : layers) {
+                String[] row = [
+                        String.valueOf(lyr.id),
+                        String.valueOf(lyr.name),
+                        String.valueOf(lyr.displayname),
+                        String.valueOf(lyr.description.replaceAll("\n", " ")),
+                        String.valueOf(lyr.source),
+                        String.valueOf(lyr.source_link),
+                        String.valueOf(lyr.respparty_role),
+                        String.valueOf(lyr.mddatest),
+                        String.valueOf(lyr.citation_date),
+                        String.valueOf(lyr.licence_level),
+                        String.valueOf(lyr.licence_link),
+                        String.valueOf(lyr.licence_notes.replaceAll("\n", " ")),
+                        String.valueOf(lyr.type),
+                        String.valueOf(lyr.classification1),
+                        String.valueOf(lyr.classification2),
+                        String.valueOf(lyr.environmentalvalueunits),
+                        String.valueOf(lyr.notes.replaceAll("\n", " ")),
+                        String.valueOf(lyr.metadatapath),
+                        String.valueOf(lyr.keywords),
+                        String.valueOf(lyr.getDt_added() == null ? '' : sdf.format(lyr.getDt_added()))]
+
+                cw.writeNext(row)
             }
-            cw.writeAll(mylist)
+            cw.flush()
         } catch (err) {
             log.trace(err.getMessage(), err)
         } finally {
@@ -141,6 +160,46 @@ class LayerController {
 
     }
 
+    def download(String id) {
+        Layer l = layerDao.getLayerByDisplayName(id)
+        if (downloadAllowed(l)) {
+            OutputStream outputStream = null
+            try {
+                outputStream = response.outputStream as OutputStream
+                //write resource
+                response.setContentType("application/octet-stream")
+                response.setHeader("Content-disposition", "attachment;filename=${id}.zip")
+
+                // When a geotiff exists, only download the geotiff
+                def path = "/layer/${l.name}"
+                def geotiff = new File(grailsApplication.config.data.dir + path + ".tif")
+                if (geotiff.exists()) {
+                    path += ".tif"
+                }
+
+                fileService.write(outputStream, path)
+                outputStream.flush()
+            } catch (err) {
+                log.error(err.getMessage(), err)
+            } finally {
+                if (outputStream != null) {
+                    try {
+                        outputStream.close()
+                    } catch (err) {
+                        log.error(err.getMessage(), err)
+                    }
+                }
+            }
+        } else {
+            response.sendError(404, "$id not available")
+        }
+    }
+
+    private downloadAllowed(layer) {
+        return grailsApplication.config.download.layer.licence_levels.contains(layer.licence_level) ||
+                authService.userInRole(grailsApplication.config.auth.admin_role)
+    }
+
     def more(String id) {
         Layer l = layerDao.getLayerByName(id)
 
@@ -152,12 +211,18 @@ class LayerController {
                 log.error 'failed to get layer: ' + id, err
             }
         }
-        render(view: "show.gsp", model: [layer: l.toMap()])
+
+
+        render(view: "show.gsp", model: [layer: l.toMap(), downloadAllowed: downloadAllowed(l)])
     }
 
     def index(String id) {
         if (id == null)
-            render layerDao.getLayers() as JSON
+            if (params?.all?.toBoolean()) {
+                render layerDao.getLayersForAdmin() as JSON
+            } else {
+                render layerDao.getLayers() as JSON
+            }
         else
             show(id)
     }

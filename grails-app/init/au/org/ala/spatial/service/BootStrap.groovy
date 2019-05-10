@@ -15,6 +15,7 @@ class BootStrap {
 
     def monitorService
     def slaveService
+    def slaveConnectService
     def grailsApplication
     def masterService
     def tasksService
@@ -23,8 +24,6 @@ class BootStrap {
     def groovySql
 
     def init = { servletContext ->
-
-        log.error("TEST")
 
         layersStoreConfig(grailsApplication.config)
 
@@ -53,16 +52,16 @@ class BootStrap {
             return it?.getTime()
         }
 
-        if (grailsApplication.config.service.enable) {
+        if (grailsApplication.config.service.enable.toBoolean()) {
             monitorService.init()
         }
-        if (grailsApplication.config.slave.enable) {
+        if (grailsApplication.config.slave.enable.toBoolean()) {
             slaveService.monitor()
         }
 
         //create database required by layers-store
         try {
-            def rs = groovySql.executeQuery("SELECT * FROM fields WHERE id = '${grailsApplication.config.userObjectsField;}'")
+            def rs = groovySql.executeQuery("SELECT * FROM fields WHERE id = '${grailsApplication.config.userObjectsField}'")
             if (rs.isClosed() || rs.getRow() == 0) {
                 groovySql.execute("INSERT INTO fields (id, name, \"desc\", type, indb, enabled, namesearch) VALUES " +
                         "('${grailsApplication.config.userObjectsField}', 'user', '', 'c', false, false, false);")
@@ -92,10 +91,32 @@ class BootStrap {
         } catch (Exception e) {
             log.error("Error creating missing azimuth function frmo st_azimuth", e)
         }
+
+        //create objects name idx if it is missing
+        try {
+            def rs = groovySql.executeQuery("SELECT * FROM pg_class WHERE relname = 'objects_name_idx';")
+            if (rs.isClosed() || rs.getRow() == 0) {
+                groovySql.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+                groovySql.execute("CREATE INDEX objects_name_idx ON objects USING gin (name gin_trgm_ops) WHERE namesearch is true;")
+            }
+        } catch (Exception e) {
+            if (!e.getMessage().contains("already exists")) {
+                log.error("Error ", e)
+            }
+        }
     }
 
     def layersStoreConfig(Config config) {
         //set layers-store values that are determined from other config
+        def resolutions = config.grdResolutions
+        if (!(resolutions instanceof List)) {
+            // comma separated or JSON list
+            if (resolutions.toString().startsWith("[")) {
+                resolutions = new org.json.simple.parser.JSONParser().parse(resolutions.toString())
+            } else {
+                resolutions = Arrays.asList(resolutions.toString().split(","))
+            }
+        }
         config.with {
             layers_store.ALASPATIAL_OUTPUT_PATH=data.dir + File.separator + 'layer'
             layers_store.LAYER_FILES_PATH=data.dir + File.separator
@@ -104,7 +125,7 @@ class BootStrap {
             layers_store.GEOSERVER_USERNAME=geoserver.username
             layers_store.GEOSERVER_PASSWORD=geoserver.password
             layers_store.GDAL_PATH=gdal.dir
-            layers_store.ANALYSIS_RESOLUTIONS=grdResolutions.join(',')
+            layers_store.ANALYSIS_RESOLUTIONS = resolutions.join(',')
             layers_store.ANALYSIS_LAYER_FILES_PATH=data.dir + File.separator + 'standard_layer'
             layers_store.ANALYSIS_TMP_LAYER_FILES_PATH=data.dir + File.separator + 'private' + File.separator
             layers_store.OCCURRENCE_SPECIES_RECORDS_FILENAME=data.dir + File.separator + 'private' + File.separator + 'occurrenceSpeciesRecords.csv'

@@ -43,9 +43,21 @@ class Slave {
                 //find a pool item that matches task.name
                 def tsize = lim.pool.get(task.name)
 
+                // is there a user or admin size?
+                if (tsize == null) {
+                    def spec = capabilities.get(task.name)
+                    if (spec != null) {
+                        tsize = lim.pool.get(spec?.private?.public != false ? "user" : "admin")
+                    }
+                }
+
+                // use default size
+                if (tsize == null) {
+                    tsize = 1
+                }
+
                 //add if it fits
-                if ((tsize != null && tsize + size < lim.total) ||
-                        (lim.pool.size() == 0 && size < lim.total)) {
+                if (tsize + size < lim.total) {
                     //add
                     if (!test) {
                         lim.tasks.put(task.id, task)

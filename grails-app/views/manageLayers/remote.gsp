@@ -1,23 +1,28 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <html>
 <head>
-    <title></title>
+    <title>Copy Layers</title>
+    <meta name="breadcrumbs" content="${g.createLink( controller: 'main', action: 'index')}, Spatial Service"/>
     <meta name="layout" content="main"/>
 
     <script src="${resource(dir: 'js', file: 'jquery.js')}"></script>
     <script src="${resource(dir: 'js', file: 'jquery.dataTables.min.js')}"></script>
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'jquery.dataTables.min.css')}" type="text/css">
+    <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-
-<body>
+<body class="fluid">
 <div class="col-lg-8">
-    <ul class="breadcrumb">
-        <li><g:link controller="main" action="index">Home</g:link></li>
-        <li class="active">Copy Layers</li>
-    </ul>
+    <h1>Copy Layers from Remote Server</h1>
 </div>
 
-<div class="panel panel-default col-lg-4">
+<g:if test="${spatialServiceUrl == localUrl}">
+    <div class="col-lg-8">
+        <div class="warning">The local and remote server is the same so layers cannot be copied</div>
+    </div>
+</g:if>
+
+<div class=" col-lg-4">
+<div class="panel panel-default">
     <div class="panel-heading">
         <h4 class="panel-title">Navigation</h4>
     </div>
@@ -27,6 +32,7 @@
         <li><g:link controller="tasks" action="index">Show all Tasks</g:link></li>
         <li><g:link controller="manageLayers" action="remote">Copy Layers from remote server</g:link></li>
     </div>
+</div>
 </div>
 
 <g:if test="${error != null}">
@@ -73,9 +79,10 @@
                         <a target="_blank" href="${localUrl}/manageLayers/layer/${item.layerId}" >(L)</a>
                         <a target="_blank" href="${spatialServiceUrl}/manageLayers/layer/${item.layerId}" >(R)</a></td>
                     <td>${item.name}</td>
-                    <td>${item?.local?.enabled}</td>
+                <td id="txtenable${item.id}">${item?.local?.enabled}</td>
                     <td>${item?.remote?.enabled}</td>
-                    <td></td>
+                <td><g:if test="${!item?.local?.enabled}"><button onclick="enable('${item.id}')"
+                                                                  id="enable${item.id}">enable</button></g:if></td>
                 </tr>
             </g:each>
             </tbody>
@@ -107,8 +114,8 @@
                     <td>${item.name}</td>
                     <td>${item?.local?.enabled}</td>
                     <td>${item?.remote?.enabled}</td>
-                    <td><g:link controller="manageLayers" action="copy"
-                                params="[fieldId: item.id, spatialServiceUrl: spatialServiceUrl]">copy</g:link></td>
+                    <td id="txtcopy${item.id}"><button onclick="copy('${item.id}')" id="copy${item.id}">copy</button>
+                    </td>
                 </tr>
             </g:each>
             </tbody>
@@ -139,10 +146,11 @@
                     <td>${item.layerId}
                         <a target="_blank" href="${localUrl}/manageLayers/layer/${item.layerId}" >(L)</a>
                         </td>
-                    <td>${item?.local?.enabled}</td>
+                    <td id="txtenable${item.id}">${item?.local?.enabled}</td>
                     <td>${item?.remote?.enabled}</td>
                     <td>${item.name}</td>
-                    <td></td>
+                    <td><<g:if test="${!item?.local?.enabled}"><button onclick="enable('${item.id}')"
+                                                                       id="enable${item.id}">enable</button></g:if></td>
                 </tr>
             </g:each>
             </tbody>
@@ -211,8 +219,22 @@
             $(".listBlock").hide()
             $("#" + listSelector.value).show();
         });
-
     });
+
+    function copy(id) {
+        $.post("${localUrl}/manageLayers/copy?fieldId=" + id + "&spatialServiceUrl=" + encodeURIComponent("${spatialServiceUrl}"))
+        $('#copy' + id)[0].remove();
+        $('#txtcopy' + id)[0].innerText = 'copying';
+    }
+
+    function enable(id) {
+        $.post("${localUrl}/manageLayers/enable?id=" + id);
+        $.post("${localUrl}/manageLayers/enable?id=" + id.substr(2));
+        while ($('#enable' + id).length > 0) {
+            $('#enable' + id)[0].remove();
+            $('#txtenable' + id)[0].innerText = 'true';
+        }
+    }
 
     function downloadLayers(type) {
         var downloadurl = "/layers-service/layers";

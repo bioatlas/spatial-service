@@ -89,7 +89,7 @@ class MonitorService {
 
                     //make this task available for another slave
                     try {
-                        log.warn "making available to another slave" + task.id
+                        log.warn "making task available to another slave: " + task.id
                         def newValues = [status: 0, url: null, slave: null]
                         tasksService.update(task.id, newValues)
                     } catch (StaleObjectStateException err) {
@@ -188,12 +188,30 @@ class MonitorService {
                             }
 
                             //add default inputs
+                            def shpResolutions = grailsApplication.config.shpResolutions
+                            if (!(shpResolutions instanceof List)) {
+                                // comma separated or JSON list
+                                if (shpResolutions.toString().startsWith("[")) {
+                                    shpResolutions = new org.json.simple.parser.JSONParser().parse(shpResolutions.toString())
+                                } else {
+                                    shpResolutions = Arrays.asList(shpResolutions.toString().split(","))
+                                }
+                            }
+                            def grdResolutions = grailsApplication.config.grdResolutions
+                            if (!(grdResolutions instanceof List)) {
+                                // comma separated or JSON list
+                                if (grdResolutions.toString().startsWith("[")) {
+                                    grdResolutions = new org.json.simple.parser.JSONParser().parse(grdResolutions.toString())
+                                } else {
+                                    grdResolutions = Arrays.asList(grdResolutions.toString().split(","))
+                                }
+                            }
                             i.put('layersServiceUrl', grailsApplication.config.grails.serverURL)
                             i.put('bieUrl', grailsApplication.config.bie.baseURL)
                             i.put('biocacheServiceUrl', grailsApplication.config.biocacheServiceUrl)
                             i.put('phyloServiceUrl', grailsApplication.config.phyloServiceUrl)
-                            i.put('shpResolutions', grailsApplication.config.shpResolutions)
-                            i.put('grdResolutions', grailsApplication.config.grdResolutions)
+                            i.put('shpResolutions', shpResolutions)
+                            i.put('grdResolutions', grdResolutions)
                             i.put('sandboxHubUrl', grailsApplication.config.sandboxHubUrl)
                             i.put('sandboxBiocacheServiceUrl', grailsApplication.config.sandboxBiocacheServiceUrl)
                             i.put('geoserverUrl', grailsApplication.config.geoserver.url)

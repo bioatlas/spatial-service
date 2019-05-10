@@ -1,11 +1,12 @@
 <%@ page contentType="text/html;charset=UTF-8" %>
 <html>
 <head>
-    <title></title>
+    <title>Tabulation</title>
+    <meta name="breadcrumbs" content="${g.createLink( controller: 'main', action: 'index')}, Spatial Service \\ ${g.createLink( controller: 'tabulation', action: 'index')}, Tabulations"/>
     <meta name="layout" content="main"/>
+    <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-
-<body>
+<body class="fluid">
 <style>
     body {
         font-size: 12px;
@@ -13,9 +14,7 @@
 </style>
 
 <ul class="breadcrumb">
-    <li><g:link controller="main" action="index">Home</g:link></li>
-    <li><g:link controller="tabulation" action="index">Tabulations</g:link></li>
-    <li class="active">${label}</li>
+    <h1>Tabulation</h1>
 </ul>
 <div class="container-fluid">
     <div style="margin:10px">
@@ -47,7 +46,6 @@
         </tbody>
     </table>
 </div>
-
 <script>
     function downloadCSV() {
         var downloadurl = '${request.forwardURI.replace(".html",".csv")}';

@@ -21,6 +21,7 @@ import au.org.ala.layers.util.SpatialUtil
 import au.org.ala.spatial.Util
 import grails.converters.JSON
 import grails.gorm.transactions.Transactional
+import org.apache.commons.lang3.StringUtils
 
 class TasksService {
 
@@ -30,13 +31,20 @@ class TasksService {
     def fieldDao
     def layerIntersectDao
 
+    def taskService
+
     def cancel(task) {
         try {
             def response = null
 
             if (task?.slave) {
-                def url = task.slave + "/task/cancel"
-                response = grails.converters.JSON.parse(Util.getUrl(url))
+                if (task.slave.equals(grailsApplication.config.grails.serverURL)) {
+                    taskService.cancel(task.id)
+                    response = true
+                } else {
+                    def url = task.slave + "/task/cancel/" + task.id
+                    response = grails.converters.JSON.parse(Util.getUrl(url))
+                }
             }
 
             // TODO: confirm the task is not finished before setting as cancelled
@@ -83,12 +91,12 @@ class TasksService {
         Task t = Task.get(id)
         if (t != null) {
             newValues.each { k, v ->
-                if ('status'.equals(k)) t.status = v
+                if ('status'.equals(k)) t.status = Integer.parseInt("" + v)
                 else if ('message'.equals(k)) t.message = v
                 else if ('url'.equals(k)) t.url = v
                 else if ('history'.equals(k)) {
                     v.each { k1, v1 ->
-                        t.history.put(k1, trimString(v1, 254))
+                        t.history.put("" + k1, trimString(v1, 254))
                     }
                 } else if ('slave'.equals(k)) t.slave = v
                 else if ('output'.equals(k)) t.output = v
@@ -166,13 +174,12 @@ class TasksService {
                     }
                     inputs.add(new InputParameter(name: k, value: (list as JSON).toString(), task: task))
                 } else if (v instanceof List) {
+                    for (def item : v) {
+                        registerSpeciesQid(item)
+                    }
                     inputs.add(new InputParameter(name: k, value: (v as JSON).toString(), task: task))
                 } else if (v instanceof Map) {
-                    //register species qid
-                    if (v.containsKey('q') && v.containsKey('bs') && v.q instanceof List &&
-                            v.containsKey('bs') && v.q.size() > 0) {
-                        v.put('q', 'qid:' + Util.makeQid(v))
-                    }
+                    registerSpeciesQid(v)
 
                     inputs.add(new InputParameter(name: k, value: (v as JSON).toString(), task: task))
                 } else {
@@ -191,6 +198,13 @@ class TasksService {
         }
 
         task
+    }
+
+    def registerSpeciesQid(v) {
+        if (v instanceof Map && v.containsKey('q') && v.containsKey('bs') &&
+                v.q instanceof List && v.q.size() > 0) {
+            v.put('q', 'qid:' + Util.makeQid(v))
+        }
     }
 
     // attach final log, message and outputs to a task
@@ -367,7 +381,7 @@ class TasksService {
                         //TODO: update getObjectByPid to support envelope areas
                         if (i.containsKey("pid") && objectDao.getObjectByPid(i.pid) == null) {
                             errors.put(k, "Input parameter $k=${i.pid} has an invalid pid value.")
-                        } else if (i.containsKey("wkt") && SpatialUtil.calculateArea(i.wkt) <= 0 /* TODO: validateInput WKT */) {
+                        } else if (i.containsKey("wkt") && !StringUtils.isEmpty(i.wkt) && SpatialUtil.calculateArea(i.wkt) <= 0 /* TODO: validateInput WKT */) {
                             errors.put(k, "Input parameter $k has invalid WKT.")
                         } else {
                             //area size constraints
@@ -375,7 +389,7 @@ class TasksService {
                                 //calc area
                                 double areaKm = 0
                                 for (Object area : i) {
-                                    if (i.containsKey("pid")) {
+                                    if (i.containsKey("pid") && objectDao.getObjectByPid(i.pid) != null) {
                                         areaKm += objectDao.getObjectByPid(i.pid).getArea_km()
                                     } else if (i.containsKey("wkt")) {
                                         areaKm += SpatialUtil.calculateArea(i.wkt)

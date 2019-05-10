@@ -27,7 +27,6 @@ import org.geotools.geojson.geom.GeometryJSON
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-//TODO: replace batch intersections with a slave process
 class IntersectController {
 
     ObjectDAO objectDao
@@ -35,24 +34,30 @@ class IntersectController {
     GrailsApplication grailsApplication
 
     def intersect(String ids, Double lat, Double lng) {
+        if (lat == null) {
+            render status: 400, text: "Path parameter `lat` is not a number."
+            return
+        }
+        if (lng == null) {
+            render status: 400, text: "Path parameter `lng` is not a number."
+            return
+        }
         render layerIntersectDao.samplingFull(ids, lng, lat) as JSON
     }
 
     def batch() {
         File dir = new File((grailsApplication.config.data.dir + '/intersect/batch/') as String)
         dir.mkdirs()
-        BatchConsumer.start(layerIntersectDao, dir.getPath(), grailsApplication.config.sampling.threads)
+        BatchConsumer.start(layerIntersectDao, dir.getPath(), grailsApplication.config.sampling.threads.toInteger())
 
         //help get params when they don't pick up automatically from a POST
         String fids = params.containsKey('fids') ? params.fids : ''
         String points = params.containsKey('points') ? params.points : ''
         String gridcache = params.containsKey('gridcache') ? params.gridcache : '0'
-        try {
-            if ("POST".equalsIgnoreCase(request.getMethod()) && !params.containsKey('fids') && !params.containsKey('points')) {
-                Scanner s = new Scanner(request.getInputStream(), "UTF-8").useDelimiter("\\A")
-                String body = s.hasNext() ? ++s : ""
 
-                for (String param : body.split("&")) {
+        try {
+            if (request.post && !params.containsKey('fids') && !params.containsKey('points')) {
+                for (String param : request.reader.text.split("&")) {
                     if (param.startsWith("fids=")) {
                         fids = param.substring(5)
                     } else if (param.startsWith("points=")) {
@@ -64,20 +69,20 @@ class IntersectController {
             log.error 'failed to read POST body for batch intersect', err
         }
 
-        if (points.isEmpty() || fids.isEmpty()) {
-            render null as JSON
-        }
-
-        Map map = new HashMap()
-        String batchId
-        try {
+        if (!points || !fids) {
+            def resp = [status: 'fail', error:'request did not include points or did not include fids']
+            render resp as JSON
+        } else {
+            Map map = new HashMap()
+            String batchId
+            try {
 
             // get limits
             int pointsLimit, fieldsLimit
 
             String[] passwords = grailsApplication.config.batch_sampling_passwords.toString().split(',')
-            pointsLimit = Integer.parseInt(grailsApplication.config.batch_sampling_points_limit.toString())
-            fieldsLimit = Integer.parseInt(grailsApplication.config.batch_sampling_fields_limit.toString())
+            pointsLimit = grailsApplication.config.batch_sampling_points_limit.toInteger()
+            fieldsLimit = grailsApplication.config.batch_sampling_fields_limit.toInteger()
 
             String password = params.containsKey('pw') ? params.pw : null
             for (int i = 0; password != null && i < passwords.length; i++) {
@@ -111,20 +116,20 @@ class IntersectController {
                 map.put("statusUrl", grailsApplication.config.grails.serverURL + '/intersect/batch/' + batchId)
             }
 
-            render map as JSON
-            return
-        } catch (Exception e) {
-            e.printStackTrace()
+                render map as JSON
+                return
+            } catch (Exception e) {
+                log.error(e.getMessage(), e)
+                map.put("error", "failed to create new batch")
+                render map as JSON
+            }
         }
-
-        map.put("error", "failed to create new batch")
-        render map as JSON
     }
 
     def batchStatus(String id) {
         File dir = new File((grailsApplication.config.data.dir + '/intersect/batch/') as String)
         dir.mkdirs()
-        BatchConsumer.start(layerIntersectDao, dir.getPath(), grailsApplication.config.sampling.threads)
+        BatchConsumer.start(layerIntersectDao, dir.getPath(), grailsApplication.config.sampling.threads.toInteger())
 
         Map map = new HashMap()
         try {
@@ -144,7 +149,7 @@ class IntersectController {
 
         File dir = new File((grailsApplication.config.data.dir + '/intersect/batch/') as String)
         dir.mkdirs()
-        BatchConsumer.start(layerIntersectDao, dir.getPath(), grailsApplication.config.sampling.threads)
+        BatchConsumer.start(layerIntersectDao, dir.getPath(), grailsApplication.config.sampling.threads.toInteger())
 
         OutputStream os = null
         BufferedInputStream bis = null
@@ -205,8 +210,20 @@ class IntersectController {
         render map as JSON
     }
 
-    def pointRadius(String fid, Double lat, Double lng, Double radiusKm) {
-        render objectDao.getObjectsWithinRadius(fid, lat, lng, radiusKm) as JSON
+    def pointRadius(String fid, Double lat, Double lng, Double radius) {
+        if (lat == null) {
+            render status: 400, text: "Path parameter `lat` is not a number."
+            return
+        }
+        if (lng == null) {
+            render status: 400, text: "Path parameter `lng` is not a number."
+            return
+        }
+        if (radius == null) {
+            render status: 400, text: "Path parameter `radius` is not a number."
+            return
+        }
+        render objectDao.getObjectsWithinRadius(fid, lat, lng, radius) as JSON
     }
 
     def wktGeometryIntersect(String fid) {
@@ -234,8 +251,20 @@ class IntersectController {
         render objectDao.getObjectsIntersectingWithObject(fid, pid) as JSON
     }
 
-    def poiPointRadiusIntersect(Double lat, Double lng, Double radiusKm) {
-        render objectDao.getPointsOfInterestWithinRadius(lat, lng, radiusKm) as JSON
+    def poiPointRadiusIntersect(Double lat, Double lng, Double radius) {
+        if (lat == null) {
+            render status: 400, text: "Path parameter `lat` is not a number."
+            return
+        }
+        if (lng == null) {
+            render status: 400, text: "Path parameter `lng` is not a number."
+            return
+        }
+        if (radius == null) {
+            render status: 400, text: "Path parameter `radius` is not a number."
+            return
+        }
+        render objectDao.getPointsOfInterestWithinRadius(lat, lng, radius) as JSON
     }
 
     def wktPoiIntersectGet() {
@@ -253,10 +282,26 @@ class IntersectController {
     }
 
     def objectPoiIntersect(Integer pid) {
+        if (pid == null) {
+            render status: 400, text: "Path parameter `pid` is not an integer."
+            return
+        }
         render objectDao.pointsOfInterestObjectIntersect(Integer.toString(pid)) as JSON
     }
 
     def poiPointRadiusIntersectCount(Double lat, Double lng, Double radiusKm) {
+        if (lat == null) {
+            render status: 400, text: "Path parameter `lat` is not a number."
+            return
+        }
+        if (lng == null) {
+            render status: 400, text: "Path parameter `lng` is not a number."
+            return
+        }
+        if (radiusKm == null) {
+            render status: 400, text: "Path parameter `radiusKm` is not a number."
+            return
+        }
         Map map = new HashMap()
         map.put("count", objectDao.getPointsOfInterestWithinRadiusCount(lat, lng, radiusKm))
 
@@ -279,6 +324,11 @@ class IntersectController {
     }
 
     def objectPoiIntersectCount(Integer pid) {
+        if (pid == null) {
+            render status: 400, text: "Path parameter `pid` is not an integer."
+            return
+        }
+
         Map map = new HashMap()
         map.put("count", objectDao.pointsOfInterestObjectIntersectCount(Integer.toString(pid)))
 

@@ -73,6 +73,11 @@ class DistributionController {
     }
 
     def show(Long id) {
+        if (id == null) {
+            render status: 400, text: "Path parameter `id` is not an integer."
+            return
+        }
+
         def distribution = distributionsService.show(params, id, Distribution.EXPERT_DISTRIBUTION)
 
         if (distribution instanceof String) {
@@ -264,6 +269,10 @@ class DistributionController {
     }
 
     def overviewMapPngSpcode(Long spcode) {
+        if (spcode == null) {
+            render status: 400, text: "Path parameter `spcode` is not an integer."
+            return
+        }
         image(response, null, spcode, null)
     }
 
@@ -290,11 +299,11 @@ class DistributionController {
 
         try {
             if (spcode != null) {
-                geomIdx = distributionDao.getDistributionBySpcode(spcode, Distribution.EXPERT_DISTRIBUTION, true).getGeom_idx()
+                geomIdx = distributionDao.getDistributionBySpcode(spcode, Distribution.EXPERT_DISTRIBUTION, true)?.getGeom_idx()
             } else if (lsid != null) {
-                geomIdx = distributionDao.getDistributionByLSID([lsid] as String[], Distribution.EXPERT_DISTRIBUTION, true).get(0).getGeom_idx()
+                geomIdx = distributionDao.getDistributionByLSID([lsid] as String[], Distribution.EXPERT_DISTRIBUTION, true)?.get(0)?.getGeom_idx()
             } else if (scientificName != null) {
-                geomIdx = distributionDao.findDistributionByLSIDOrName(scientificName, Distribution.EXPERT_DISTRIBUTION).getGeom_idx()
+                geomIdx = distributionDao.findDistributionByLSIDOrName(scientificName, Distribution.EXPERT_DISTRIBUTION)?.getGeom_idx()
             }
         } catch (err) {
             log.error 'no distribution found:' + lsid + ',' + spcode + ',' + scientificName, err

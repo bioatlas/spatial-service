@@ -1,8 +1,5 @@
-import grails.util.BuildSettings
-import grails.util.Environment
 import org.springframework.boot.logging.logback.ColorConverter
 import org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter
-
 import java.nio.charset.Charset
 
 conversionRule 'clr', ColorConverter
@@ -12,27 +9,13 @@ conversionRule 'wex', WhitespaceThrowableProxyConverter
 appender('STDOUT', ConsoleAppender) {
     encoder(PatternLayoutEncoder) {
         charset = Charset.forName('UTF-8')
-
         pattern =
-                '%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} ' + // Date
-                        '%clr(%5p) ' + // Log level
-                        '%clr(---){faint} %clr([%15.15t]){faint} ' + // Thread
-                        '%clr(%-40.40logger{39}){cyan} %clr(:){faint} ' + // Logger
+                '[SPATIAL-SERVICE] %clr(%d{HH:mm:ss.SSS}){faint} ' + // Date
+                        '%clr(%logger{5}){cyan} %clr(:){faint} ' + // Logger
                         '%m%n%wex' // Message
     }
 }
-
-def targetDir = BuildSettings.TARGET_DIR
-if (Environment.isDevelopmentMode() && targetDir != null) {
-    appender("FULL_STACKTRACE", FileAppender) {
-        file = "${targetDir}/stacktrace.log"
-        append = true
-        encoder(PatternLayoutEncoder) {
-            pattern = "%level %logger - %msg%n"
-        }
-    }
-    logger("StackTrace", ERROR, ['FULL_STACKTRACE'], false)
-    logger("au.org.ala.layers", DEBUG, ['STDOUT'], false)
-    logger("au.org.ala.spatial", DEBUG, ['STDOUT'], false)
-}
-root(ERROR, ['STDOUT'])
+logger("au.org.ala.spatial.service.MonitorService", INFO, ['STDOUT'], false)
+logger("au.org.ala.layers", DEBUG, ['STDOUT'], false)
+logger("au.org.ala.spatial", DEBUG, ['STDOUT'], false)
+root(WARN, ['STDOUT'])

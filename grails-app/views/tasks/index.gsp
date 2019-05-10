@@ -3,15 +3,15 @@
 <html>
 <head>
     <meta name="layout" content="main">
+    <title>Tasks</title>
+    <meta name="breadcrumbs" content="${g.createLink( controller: 'main', action: 'index')}, Spatial Service"/>
     <g:set var="entityName" value="${message(code: 'task.label', default: 'Task')}"/>
-    <title><g:message code="default.list.label" args="[entityName]"/></title>
-
     <script src="${resource(dir: 'js', file: 'jquery.js')}"></script>
     <script src="${resource(dir: 'js', file: 'jquery.dataTables.min.js')}"></script>
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'jquery.dataTables.min.css')}" type="text/css">
+    <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-
-<body>
+<body class="fluid">
 <script type="text/javascript">
     $(document).ready(function () {
         // make table header cells clickable
@@ -34,21 +34,17 @@
 </script>
 
 <div class="col-lg-8">
-    <ul class="breadcrumb">
-        <li><g:link controller="main" action="index">Home</g:link></li>
-        <li class="active">Tasks</li>
-    </ul>
 </div>
 
-<div class="panel panel-default col-lg-4">
-    <div class="panel-heading">
-        <h4 class="panel-title">Navigation</h4>
-    </div>
-    <div class="panel-body">
-        <li><g:link controller="manageLayers" action="uploads">Show all uploads</g:link></li>
-        <li><g:link controller="manageLayers" action="layers">Show all Layers</g:link></li>
-        <li><g:link controller="tasks" action="index">Show all Tasks</g:link></li>
-        <li><g:link controller="manageLayers" action="remote">Copy Layers from remote server</g:link></li>
+<div class="col-lg-4">
+    <div class="panel panel-default">
+        <div class="panel-heading">Navigation</div>
+        <div class="panel-body">
+            <li><g:link controller="manageLayers" action="uploads">Show all uploads</g:link></li>
+            <li><g:link controller="manageLayers" action="layers">Show all Layers</g:link></li>
+            <li><g:link controller="tasks" action="index">Show all Tasks</g:link></li>
+            <li><g:link controller="manageLayers" action="remote">Copy Layers from remote server</g:link></li>
+        </div>
     </div>
 </div>
 
@@ -99,7 +95,6 @@
     </div>
     <table class="table table-bordered table-striped">
         <thead>
-        <tr>
 
             <g:sortableColumn property="message" title="${message(code: 'task.message.label', default: 'Message')}"/>
 
@@ -113,9 +108,12 @@
 
             <g:sortableColumn property="status" title="${message(code: 'task.status.label', default: 'Status')}"/>
 
-            <g:sortableColumn property="history" title="${message(code: 'task.history.label', default: 'History')}"/>
+            <g:sortableColumn property="history"
+                              title="${message(code: 'task.history.label', default: 'History (last 4 entries)')}"/>
 
-        </tr>
+            <th></th>
+
+            <th></th>
         </thead>
         <tbody>
         <g:each in="${taskInstanceList}" status="i" var="taskInstance">
@@ -128,16 +126,18 @@
 
                 <td>${fieldValue(bean: taskInstance, field: "name")}</td>
 
-                <td>${fieldValue(bean: taskInstance, field: "tag")}</td>
+                <td>${fieldValue(bean: taskInstance, field: "tag") && fieldValue(bean: taskInstance, field: "tag") != 'null' ?  fieldValue(bean: taskInstance, field: "tag") : ''}</td>
 
-                <td><g:formatDate date="${taskInstance.created}"/></td>
+                <td><g:formatDate date="${taskInstance.created}" format="dd/MM/yy hh:mm:ss"/></td>
 
                 <td>${fieldValue(bean: taskInstance, field: "status")}</td>
 
-                <td>${fieldValue(bean: taskInstance, field: "history")}</td>
+                <td><g:each in="${taskInstance.history}" var="h">
+                    <g:formatDate date="${h.key}" format="dd/MM/yy hh:mm:ss"/>=${h.value}<br/>
+                </g:each></td>
 
-                <td><g:link action="reRun" id="${taskInstance.id}" params="${params}">re-run task</g:link></td>
-                <td><g:link action="cancel" id="${taskInstance.id}" params="${params}">cancel</g:link></td>
+                <td><g:link action="reRun" class="btn btn-sm btn-default" id="${taskInstance.id}" params="${params}">re-run task</g:link></td>
+                <td><g:link action="cancel" class="btn btn-sm btn-default" id="${taskInstance.id}" params="${params}">cancel</g:link></td>
 
             </tr>
         </g:each>

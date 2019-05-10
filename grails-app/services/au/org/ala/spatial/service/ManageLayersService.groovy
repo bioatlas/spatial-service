@@ -184,6 +184,7 @@ class ManageLayersService {
             def columns = []
             def name = ''
             def shp = null
+            def hdr = null
             def bil = null
             def grd = null
             def count = 0
@@ -195,7 +196,17 @@ class ManageLayersService {
                 pth.listFiles().each { f ->
                     if (f.isDirectory()) {
                         f.listFiles().each { sf ->
-                            FileUtils.moveToDirectory(sf, f.getParentFile(), false)
+                            try {
+                                FileUtils.moveToDirectory(sf, f.getParentFile(), false)
+                            } catch (IOException e) {
+                                // try a copy + delete
+                                if (sf.isFile()) {
+                                    FileUtils.copyFileToDirectory(sf, f.getParentFile())
+                                } else if (sf.isDirectory()) {
+                                    FileUtils.copyDirectoryToDirectory(sf, f.getParentFile())
+                                }
+                                sf.delete()
+                            }
                         }
                         f.delete()
                         moved = true
@@ -215,10 +226,12 @@ class ManageLayersService {
                 } else if (f.getPath().toLowerCase().endsWith(".grd")) {
                     grd = f
                 }
+                log.info("Files found..." + f.getName())
             }
 
             //diva to bil
             if (grd != null && bil == null) {
+                log.info("Converting DIVA to BIL")
                 def n = grd.getPath().substring(0, grd.getPath().length() - 4)
                 Diva2bil.diva2bil(n, n)
                 bil = n + '.hdr'
@@ -228,36 +241,48 @@ class ManageLayersService {
 
             //rename the file
             if (count == 1) {
-                pth.listFiles().each { f ->
-                    if (!name.equals(newName) && f.getName().length() > 4 &&
-                            f.getName().substring(0, f.getName().length() - 4).equals(name)) {
-                        def newF = new File(f.getParent() + "/" + f.getName().replace(name, newName))
-                        if (!newF.getPath().equals(f.getPath())) FileUtils.moveFile(f, newF)
+            pth.listFiles().each { f ->
+                if (!name.equals(newName) && f.getName().length() > 4 &&
+                        f.getName().substring(0, f.getName().length() - 4).equals(name)) {
+                    def newF = new File(f.getParent() + "/" + f.getName().replace(name, newName))
+                    if (!newF.getPath().equals(f.getPath())) {
+                        FileUtils.moveFile(f, newF)
+                        log.info("Moving file ${f.getName()} to ${newF.getName()}")
                     }
                 }
+            }
 
-                //store name
-                FileUtils.write(new File(pth.getPath() + "/original.name"), name)
+            //store name
+            FileUtils.write(new File(pth.getPath() + "/original.name"), name)
+            log.info("Original file name stored..." + name)
             }
 
             shp = new File(pth.getPath() + "/" + newName + ".shp")
             bil = new File(pth.getPath() + "/" + newName + ".bil")
             def tif = new File(pth.getPath() + "/" + newName + ".tif")
-            if (!shp.exists() && bil.exists() && !tif.exists())
+            if (!shp.exists() && bil.exists() && !tif.exists()) {
+                log.info("BIL detected...")
                 bilToGTif(bil, tif)
+            } else {
+                log.info("SHP: ${shp.getPath()}, TIF: ${tif.getPath()}, BIL: ${bil.getPath()}")
+                log.info("SHP available: ${shp.exists()}, TIF available: ${tif.exists()}, BIL available: ${bil.exists()}")
+            }
 
             def map = [:]
 
             if (!shp.exists() && !tif.exists()) {
+                log.error("No SHP or TIF available....")
                 map.put("error", "no layer files")
             } else {
                 def errors = publishService.layerToGeoserver([files: [shp.exists() ? shp.getPath() : bil.getPath()]], null)
 
                 if (errors) {
+                    log.error("Errors uploading to geoserver...." + errors.inspect())
                     map.put("error", errors.inspect())
                 } else {
                     map.put("raw_id", name)
                     map.put("columns", columns)
+                    map.put("test_id", newName)
                     map.put("test_url",
                             grailsApplication.config.geoserver.url.toString() +
                                     "/ALA/wms?service=WMS&version=1.1.0&request=GetMap&layers=ALA:" + newName +
@@ -268,9 +293,11 @@ class ManageLayersService {
             }
 
             return map
+        } else {
+            log.error("Path does not exist..." + pth)
         }
 
-        return [error: pth +" does not exist!" ]
+        return [error: pth + " does not exist!" ]
     }
 
     /**
@@ -326,6 +353,8 @@ class ManageLayersService {
     }
 
     def bilToGTif(bil, geotiff) {
+
+        log.info("BIL conversion to GeoTIFF with gdal_translate...")
         //bil 2 geotiff (?)
         String[] cmd = [grailsApplication.config.gdal.dir.toString() + "/gdal_translate", "-of", "GTiff",
                         "-co", "COMPRESS=DEFLATE", "-co", "TILED=YES", "-co", "BIGTIFF=IF_SAFER",
@@ -366,7 +395,7 @@ class ManageLayersService {
         } else {
             try {
                 layers = []
-                JSON.parse(Util.getUrl("${url}/layers")).each {
+                JSON.parse(Util.getUrl("${url}/layers?all=true")).each {
                     def layer = new ObjectMapper().readValue(it.toString(), Map.class)
                     layers.push(layer)
                 }
@@ -375,7 +404,7 @@ class ManageLayersService {
             }
             try {
                 fields = []
-                JSON.parse(Util.getUrl("${url}/fields")).each {
+                JSON.parse(Util.getUrl("${url}/fields?all=true")).each {
                     def field = new ObjectMapper().readValue(it.toString(), Field.class)
                     fields.push(field)
                 }
@@ -431,10 +460,9 @@ class ManageLayersService {
                 map.put("test_url",
                         grailsApplication.config.geoserver.url +
                                 "/ALA/wms?service=WMS&version=1.1.0&request=GetMap&layers=ALA:" + l.getName() +
-
                                 "&styles=&bbox=-180,-90,180,90&width=512&height=507&srs=EPSG:4326&format=application/openlayers")
             } catch (Exception e2) {
-                //log.error("failed to find layer for rawId: " + layerId, e2);
+                log.error("failed to find layer for rawId: " + layerId, e2);
             }
 
         }
@@ -443,7 +471,9 @@ class ManageLayersService {
         if (map.containsKey("layer_id")) {
             Layer layer = layerDao.getLayerById(Integer.parseInt(map.layer_id), false)
 
-            map.putAll(layer.toMap())
+            if(layer) {
+                map.putAll(layer.toMap())
+            }
 
             List<Field> fieldList = fieldDao.getFields()
             def fields = []
@@ -606,13 +636,17 @@ class ManageLayersService {
 //                null,null,
 //                "text/plain");
 
-        //TODO: need a process to remove uploaded files (manually added to upload dir or not)
-//        File dir = new File(layersDir + "/uploads/" + id + "/");
-//        if (dir.exists()) {
-//            try {
-//                FileUtils.deleteDirectory(dir);
-//            } catch (Exception e) {}
-//        }
+        //Soft deletes
+        File dir = new File(layersDir + "/uploads/" + id + "/");
+        if (dir.exists()) {
+            try {
+                def deletedUploadsDir = new File(layersDir + "/uploads-deleted/")
+                FileUtils.forceMkdir(deletedUploadsDir)
+                FileUtils.moveDirectory(dir, new File(layersDir + "/uploads-deleted/" + id ));
+            } catch (Exception e) {
+                log.error("Problem moving directory. Unable to move", e.getMessage())
+            }
+        }
     }
 
     def deleteField(String fieldId) {
@@ -660,8 +694,10 @@ class ManageLayersService {
 
         //fix default layer name
         if (layerMap.containsKey("displayname")) {
+            fieldMap.put("displayname", layerMap.get("displayname"))
             fieldMap.put("name", layerMap.get("displayname"))
         }
+
         //fix default layer description
         if (layerMap.containsKey("description")) {
             fieldMap.put("desc", layerMap.get("displayname"))
@@ -1330,8 +1366,6 @@ class ManageLayersService {
     def deleteDistribution(String id) {
 
         def m = getUpload(id)
-
-
 
         try {
             if (m.containsKey('data_resource_uid')) {
