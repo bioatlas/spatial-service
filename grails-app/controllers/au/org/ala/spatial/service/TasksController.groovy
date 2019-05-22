@@ -19,7 +19,6 @@ import au.org.ala.spatial.Util
 import au.org.ala.web.AuthService
 import grails.converters.JSON
 import grails.gorm.transactions.Transactional
-import org.apache.commons.io.IOUtils
 import org.grails.web.json.JSONObject
 
 @Transactional(readOnly = true)
@@ -99,8 +98,10 @@ class TasksController {
             status.history = hist
         }
 
-        status.history = status.history.sort { a, b ->
-            a.key ? a.key.compareTo(b.key) : "".compareTo(b.key)
+        if (status.history) {
+            status.history = status.history.sort { a, b ->
+                a.key ? a.key.compareTo(b.key) : "".compareTo(b.key)
+            }
         }
 
         render status as JSON
@@ -208,6 +209,7 @@ class TasksController {
     }
 
     def output() {
+
         def path = "${grailsApplication.config.data.dir}/public"
         def p1 = params.p1
         def p2 = params.p2
@@ -225,6 +227,8 @@ class TasksController {
         def file = "${path}/${p1}"
         if (p2) file += "/${p2}"
         if (p3) file += "/${p3}"
+
+        if (params.format) file+= ".${params.format}"
 
         def f = new File(file)
 
@@ -270,7 +274,8 @@ class TasksController {
                 response.setContentType("text/plain")
                 ok = true
             } else if (file.endsWith('.html')) {
-                render(text: IOUtils.toString(new FileInputStream(f)), contentType: "text/html", encoding: "UTF-8")
+                def htmlContent = f.text
+                render(text: htmlContent, contentType: "text/html", encoding: "UTF-8")
                 return
             } else if (file.endsWith('.jpg') || file.endsWith('jpeg')) {
                 response.setContentType("image/jpeg")
@@ -281,6 +286,9 @@ class TasksController {
             } else if (file.endsWith('.csv')) {
                 response.setContentType("text/plain")
                 ok = true
+            }else{
+                render(text: 'Unknow format of ' + file, contentType: "text/html", encoding: "UTF-8" )
+                return
             }
 
             if (ok) {
@@ -297,6 +305,9 @@ class TasksController {
                     os.close()
                 }
             }
+        }else{
+            render('File does not exist: ' + file, contentType: "text/html", encoding: "UTF-8" )
+            return
         }
     }
 
