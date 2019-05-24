@@ -6,7 +6,7 @@
     <meta name="layout" content="main"/>
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-<body class="fluid">
+<body class="${fluidLayout ? container-fluid : container}">
 <div class="container-fluid">
 
     <h1>Tabulations</h1>

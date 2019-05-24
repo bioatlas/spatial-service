@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'jquery.dataTables.min.css')}" type="text/css">
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-<body class="fluid">
+<body class="${fluidLayout ? container-fluid : container}">
 
 <div class="col-lg-8">
     <h1>Layer Administration</h1>

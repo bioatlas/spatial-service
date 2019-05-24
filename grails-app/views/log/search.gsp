@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
 
-<body class="fluid">
+<body class="${fluidLayout ? container-fluid : container}">
 <ul class="breadcrumb">
     <li><g:link controller="main" action="index">Home</g:link></li>
 </ul>

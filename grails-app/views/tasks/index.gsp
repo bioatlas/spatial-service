@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'jquery.dataTables.min.css')}" type="text/css">
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-<body class="fluid">
+<body class="${fluidLayout ? container-fluid : container}">
 <script type="text/javascript">
     $(document).ready(function () {
         // make table header cells clickable

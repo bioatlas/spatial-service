@@ -7,7 +7,7 @@
     <meta name="layout" content="main"/>
 </head>
 
-<body>
+<body class="${fluidLayout ? container-fluid : container}">
 
 <h1>Layer metadata: ${layer.name}</h1>
 <p class="lead">Layer metadata for the layer${layer.name}</p>

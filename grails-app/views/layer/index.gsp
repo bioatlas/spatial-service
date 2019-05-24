@@ -12,7 +12,7 @@
     #layersTable { font-size: 11px; }
     </style>
 </head>
-<body class="fluid">
+<body class="${fluidLayout ? container-fluid : container}">
 <div class="pull-right">
     <button onclick="downloadCSV()" class="btn btn-sm btn-default">
         <i class="glyphicon glyphicon-download-alt"></i> Download as CSV

@@ -5,8 +5,8 @@
     <title>Spatial Service</title>
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-<body class="fluid">
-<div class="container">
+<body class="${fluidLayout ? container-fluid : container}">
+<div>
 <h1>Spatial service</h1>
 <p>
     View spatial layers available in the system.

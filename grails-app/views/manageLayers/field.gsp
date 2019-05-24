@@ -14,7 +14,7 @@
     <script src="${resource(dir: 'js', file: 'BetterWMS.js')}"></script>
     <link rel="stylesheet" href="${resource(dir: 'css', file: 'fluid.css')}" type="text/css">
 </head>
-<body class="fluid">
+<body class="${fluidLayout ? container-fluid : container}">
 
 <div class="col-lg-8">
     <h1>Edit Field ${item && item.id ? ' : ' + item.id : ''}</h1>
